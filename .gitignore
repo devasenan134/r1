@@ -1,0 +1,17 @@
+# Archived reference build (my version; the from-scratch rebuild lives at root)
+.reference/
+
+# Environment
+.env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Local models / audio scratch
+models/
+*.wav
+*.onnx
