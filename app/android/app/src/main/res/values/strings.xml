@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">R1</string>
+    <string name="title_activity_main">R1</string>
+    <string name="package_name">cc.craftingtable.r1</string>
+    <string name="custom_url_scheme">cc.craftingtable.r1</string>
+</resources>

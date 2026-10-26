@@ -1,0 +1,9 @@
+{
+  "appId": "cc.craftingtable.r1",
+  "appName": "R1",
+  "webDir": "../server/static",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}
