@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>R1</title>
+  <style>
+    :root { --bg: #0a0a0f; --eye: #5ad1ff; --eye-glow: #2aa8e0; --text: #e8eef5; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: radial-gradient(120% 120% at 50% 35%, #15151f 0%, var(--bg) 70%);
+      color: var(--text);
+      font-family: -apple-system, system-ui, sans-serif;
+      display: flex; flex-direction: column;
+      height: 100dvh; overflow: hidden; user-select: none;
+    }
+
+    /* ---- the face ---- */
+    .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .eyes { display: flex; gap: 12vw; }
+    .eye {
+      width: 16vmin; height: 16vmin; max-width: 160px; max-height: 160px;
+      background: var(--eye); border-radius: 42% / 46%;
+      box-shadow: 0 0 40px 6px var(--eye-glow);
+      animation: blink 5.5s infinite;
+      transition: height .22s ease, background .3s ease, box-shadow .3s ease;
+    }
+    @keyframes blink {
+      0%, 92%, 100% { transform: scaleY(1); }
+      95%, 97%      { transform: scaleY(0.08); }
+    }
+    .face.thinking .eye { height: 5vmin; animation: blink 5.5s infinite, think 1.1s ease-in-out infinite; }
+    @keyframes think {
+      0%, 100% { box-shadow: 0 0 24px 3px var(--eye-glow); opacity: .6; }
+      50%      { box-shadow: 0 0 52px 10px var(--eye-glow); opacity: 1; }
+    }
+    .face.talking .eye { background: #8fe3ff; box-shadow: 0 0 56px 10px var(--eye-glow); }
+    .face.talking .eyes { animation: bob .6s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5vmin); } }
+    .face.listening .eye { height: 18vmin; background: #8fe3ff; box-shadow: 0 0 64px 14px var(--eye-glow); }
+
+    /* ---- speech caption ---- */
+    .speech { min-height: 2.6em; margin-top: 5vmin; padding: 0 24px; text-align: center;
+              font-size: 1.1rem; line-height: 1.4; opacity: .92; max-width: 640px; }
+
+    /* ---- input bar ---- */
+    form { display: flex; gap: 10px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+           border-top: 1px solid #ffffff14; background: #ffffff08; }
+    input { flex: 1; font-size: 1.05rem; padding: 14px 16px; border-radius: 14px;
+            border: 1px solid #ffffff1f; background: #0f0f17; color: var(--text); outline: none; }
+    input:focus { border-color: var(--eye-glow); }
+    button { font-size: 1.05rem; padding: 0 20px; border: none; border-radius: 14px;
+             background: var(--eye); color: #04121b; font-weight: 600; }
+    button:disabled { opacity: .4; }
+    #mic { background: #ffffff14; color: var(--eye); min-width: 56px; }
+    #mic.on { background: #ff6b6b; color: #190404; }
+    #look { background: #ffffff14; color: var(--eye); min-width: 56px; }
+    #look.on { background: #5ad1ff; color: #04121b; }
+    #probe { background: #ffffff14; color: var(--eye); min-width: 56px; }
+    #probe.on { background: #8fe3ff; color: #04121b; }
+
+    /* ---- senses latency HUD (step 1: prove transport + clock RTT) ---- */
+    .hud { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: 14px; z-index: 6;
+           font: 600 .8rem ui-monospace, Menlo, monospace; color: #8fe3ff;
+           background: #0009; border: 1px solid #ffffff1f; border-radius: 10px;
+           padding: 7px 11px; letter-spacing: .02em; white-space: pre-line; }
+    .hud[hidden] { display: none; }
+
+    /* ---- settings ---- */
+    #gear { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 14px; z-index: 5;
+            width: 40px; height: 40px; min-width: 0; padding: 0; border-radius: 50%;
+            background: #ffffff12; color: var(--text); font-weight: 400; font-size: 1.1rem; opacity: .55; }
+    #gear:hover { opacity: 1; }
+    .settings { position: fixed; inset: 0; z-index: 10; background: #000a;
+                display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .settings[hidden] { display: none; }
+    .settings-card { width: 100%; max-width: 460px; max-height: 92vh; overflow: auto;
+                     background: #14141c; border: 1px solid #ffffff1f; border-radius: 18px; padding: 20px; }
+    .settings-card h2 { margin: 0 0 6px; font-size: 1.2rem; }
+    .settings-card label { display: block; font-size: .85rem; opacity: .8; margin: 14px 0 0; }
+    .settings-card label input { display: block; width: 100%; margin-top: 6px; font-size: 1rem;
+                     padding: 11px 13px; border-radius: 12px; border: 1px solid #ffffff1f;
+                     background: #0f0f17; color: var(--text); outline: none; }
+    .settings-card label input:focus { border-color: var(--eye-glow); }
+    .settings-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .settings-actions .ghost { background: #ffffff14; color: var(--text); }
+    .settings-note { font-size: .78rem; opacity: .55; margin: 14px 0 0; text-align: center; }
+
+    /* ---- landscape-only ---- */
+    .rotate { display: none; }
+    @media (orientation: portrait) {
+      .stage, form { display: none; }
+      .rotate { flex: 1; display: flex; align-items: center; justify-content: center;
+                text-align: center; padding: 0 32px; font-size: 1.4rem; color: #8ad0ff; opacity: .9; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud" class="hud" hidden></div>
+  <div class="stage">
+    <div class="face" id="face"><div class="eyes"><div class="eye"></div><div class="eye"></div></div></div>
+    <div class="speech" id="speech">tap 🎤 and talk to me</div>
+  </div>
+  <div class="rotate">turn me sideways so I can see you 👀</div>
+  <form id="form">
+    <button id="mic" type="button" title="Toggle listening">🎤</button>
+    <button id="look" type="button" title="Let R1 look">👁</button>
+    <button id="probe" type="button" title="Senses latency probe">📡</button>
+    <input id="input" autocomplete="off" placeholder="…or type to R1" />
+    <button id="send" type="submit">Send</button>
+  </form>
+
+  <button id="gear" type="button" title="Settings" aria-label="Settings">⚙</button>
+  <div id="settings" class="settings" hidden>
+    <div class="settings-card">
+      <h2>R1 settings</h2>
+      <label>Orchestrator URL
+        <input id="s-brain" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="https://your-orchestrator" />
+      </label>
+      <label>App token
+        <input id="s-token" autocapitalize="off" autocomplete="off" placeholder="(if your orchestrator requires one)" />
+      </label>
+      <div class="settings-actions">
+        <button id="s-cancel" type="button" class="ghost">Cancel</button>
+        <button id="s-save" type="button">Save</button>
+      </div>
+      <p class="settings-note">Stored on this device only. Saving reloads R1.</p>
+    </div>
+  </div>
+
+  <script>
+    const face = document.getElementById("face");
+    const speech = document.getElementById("speech");
+    const input = document.getElementById("input");
+    const form = document.getElementById("form");
+    const mic = document.getElementById("mic");
+    const look = document.getElementById("look");
+    const probe = document.getElementById("probe");
+    const hud = document.getElementById("hud");
+    const setMood = (m) => { face.className = "face " + m; };
+
+    // ---- platform: native Capacitor app vs plain browser ----
+    const Cap = window.Capacitor;
+    const native = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+    const SRnative = native ? Cap.Plugins.SpeechRecognition : null;
+    const TTSnative = native ? Cap.Plugins.TextToSpeech : null;
+
+    // No baked host: the orchestrator URL (+ optional token) is set in ⚙ Settings and
+    // stored on the device, so the same app works wherever you run your orchestrator.
+    const BRAIN = localStorage.getItem("brain") || "";
+    const TOKEN = localStorage.getItem("token") || "";
+
+    // ---- TTS: say() resolves when speech finishes ----
+    let ttsUnlocked = false;
+    const unlock = () => {   // browser needs a gesture before it will speak
+      if (native || ttsUnlocked || !("speechSynthesis" in window)) return;
+      speechSynthesis.speak(new SpeechSynthesisUtterance(" ")); ttsUnlocked = true;
+    };
+    const browserSpeak = (text) => new Promise((resolve) => {
+      if (!("speechSynthesis" in window)) return resolve();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.startsWith("en"));
+      if (v) u.voice = v;
+      u.rate = 1.0; u.pitch = 1.15; u.onend = resolve; u.onerror = resolve;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    });
+    // speak ONE piece of text, resolving when done (no mood here — the caller
+    // owns mood, so sentences can be chained while the rest still streams in).
+    async function speakText(text) {
+      const clean = (text || "").replace(/\p{Extended_Pictographic}/gu, "").trim();
+      if (!clean) return;
+      try {
+        if (native) await TTSnative.speak({ text: clean, lang: "en-US", rate: 1.0, pitch: 1.1, volume: 1.0, category: "ambient" });
+        else await browserSpeak(clean);
+      } catch (_) {}
+    }
+
+    // ---- STT: listenOnce() resolves to a transcript ("" if nothing heard) ----
+    const BSR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let browserRecog = null;
+    const browserListenOnce = () => new Promise((resolve, reject) => {
+      if (!BSR) return resolve("");
+      const r = new BSR(); r.lang = "en-US"; r.interimResults = false; r.maxAlternatives = 1;
+      browserRecog = r; let settled = false;
+      r.onresult = (e) => { settled = true; resolve(e.results[0][0].transcript.trim()); };
+      r.onerror = (e) => { settled = true;
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") reject(Object.assign(new Error("perm"), { perm: true }));
+        else resolve(""); };
+      r.onend = () => { if (!settled) resolve(""); };
+      try { r.start(); } catch (_) { resolve(""); }
+    });
+    async function nativeListenOnce() {
+      try {
+        const res = await SRnative.start({ language: "en-US", maxResults: 1, partialResults: false, popup: false });
+        return ((res && res.matches && res.matches[0]) || "").trim();
+      } catch (_) { return ""; }
+    }
+    const listenOnce = () => (native ? nativeListenOnce() : browserListenOnce());
+    const stopListening = () => { try { native ? SRnative.stop() : (browserRecog && browserRecog.abort()); } catch (_) {} };
+
+    // ---- camera: R1 watches through the front camera; frames go to the brain ----
+    const video = document.createElement("video");
+    video.playsInline = true; video.muted = true;
+    let camStream = null, camOn = false;
+    async function startCam() {
+      if (camStream) return true;
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640 }, audio: false });
+        video.srcObject = camStream; await video.play();
+        for (let i = 0; i < 20 && !video.videoWidth; i++) await new Promise((r) => setTimeout(r, 50));
+        return true;
+      } catch (_) { speech.textContent = "👁 camera blocked — allow it in Android settings"; return false; }
+    }
+    function stopCam() {
+      if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; video.srcObject = null; }
+    }
+    // one downscaled JPEG frame as bare base64 (no data: prefix) — small enough to send every turn
+    function grabFrame() {
+      if (!camStream || !video.videoWidth) return null;
+      const w = 512, h = Math.round(video.videoHeight * w / video.videoWidth);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(video, 0, 0, w, h);
+      return c.toDataURL("image/jpeg", 0.6).split(",")[1];
+    }
+
+    // ---- senses stream (STEP 1: prove the transport + clock LAN round-trip time) ----
+    // The phone streams frame-sized payloads to the orchestrator's /senses WebSocket;
+    // the server echoes each one straight back, and RTT = now - t. Backpressure rule:
+    // only ONE frame is ever in flight — we always send the latest and never queue a
+    // backlog (exactly the "process the latest frame, drop the backlog" rule).
+    // For step 1 the payload is synthetic (~size of a 512px JPEG) so latency can be
+    // measured from a plain browser tab, with no camera permission or APK rebuild.
+    const SENSES_FPS = 5;
+    const FAKE_FRAME = "x".repeat(18 * 1024);   // ~18 KB, a stand-in low-res frame
+    let ws = null, sensesOn = false, inFlight = false, seq = 0, sensesTimer = null;
+    let rtts = [], lastSentAt = 0;
+
+    // derive the ws:// (or wss://) senses URL from the saved orchestrator URL
+    function sensesUrl() {
+      if (!BRAIN) return "";
+      try {
+        const u = new URL(BRAIN);
+        u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
+        u.pathname = u.pathname.replace(/\/$/, "") + "/senses";
+        u.search = ""; u.hash = "";
+        return u.toString();
+      } catch (_) { return ""; }
+    }
+
+    function sendFrame() {
+      if (!sensesOn || !ws || ws.readyState !== WebSocket.OPEN || inFlight) return;
+      const frame = (camOn && grabFrame()) || FAKE_FRAME;   // real frame if sight is on
+      const t = Date.now();
+      inFlight = true; lastSentAt = t;
+      ws.send(JSON.stringify({ t, seq: seq++, frame }));
+    }
+
+    function onEcho(raw) {
+      inFlight = false;
+      let t = lastSentAt;
+      try { const d = JSON.parse(raw); if (typeof d.t === "number") t = d.t; } catch (_) {}
+      const rtt = Date.now() - t;
+      rtts.push(rtt); if (rtts.length > 30) rtts.shift();
+      const sorted = [...rtts].sort((a, b) => a - b);
+      const avg = Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length);
+      const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+      hud.hidden = false;
+      hud.textContent = `📡 ${rtt} ms  (avg ${avg} · p95 ${p95})\n${rtts.length} samples · ${SENSES_FPS} fps · ${Math.round(FAKE_FRAME.length / 1024)} KB`;
+    }
+
+    function startSenses() {
+      const url = sensesUrl();
+      if (!url) { speech.textContent = "tap ⚙ to set your orchestrator URL"; openSettings(); return; }
+      sensesOn = true; rtts = []; inFlight = false; seq = 0;
+      hud.hidden = false; hud.textContent = "📡 connecting…";
+      try { ws = new WebSocket(url); } catch (_) { hud.textContent = "📡 bad URL"; sensesOn = false; return; }
+      ws.onopen = () => { hud.textContent = "📡 connected — measuring…"; sendFrame(); };
+      ws.onmessage = (e) => onEcho(e.data);                 // server echoes our payload back
+      ws.onclose = () => { if (sensesOn) hud.textContent = "📡 disconnected"; };
+      ws.onerror = () => { hud.textContent = "📡 error — is /senses running?"; };
+      sensesTimer = setInterval(sendFrame, Math.round(1000 / SENSES_FPS));  // paced; inFlight drops any backlog
+    }
+
+    function stopSenses() {
+      sensesOn = false;
+      if (sensesTimer) { clearInterval(sensesTimer); sensesTimer = null; }
+      if (ws) { try { ws.close(); } catch (_) {} ws = null; }
+      inFlight = false; hud.hidden = true;
+    }
+
+    probe.addEventListener("click", () => {
+      if (sensesOn) { probe.classList.remove("on"); stopSenses(); }
+      else { probe.classList.add("on"); startSenses(); }
+    });
+
+    // ---- one turn: prefer /stream (live caption), fall back to /chat; `image` lets R1 see ----
+    async function handleTurn(text, image) {
+      text = (text || "").trim(); if (!text && !image) return;
+      if (!BRAIN) { speech.textContent = "tap ⚙ to set your orchestrator URL"; openSettings(); return; }
+      setMood("thinking"); speech.textContent = "…";
+      const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + TOKEN };
+      const body = JSON.stringify(image ? { prompt: text, image } : { prompt: text });
+      try {
+        let res = null;
+        try { res = await fetch(BRAIN + "/stream", { method: "POST", headers, body }); }
+        catch (_) { res = null; }                         // network error → try /chat below
+
+        if (res && res.ok && res.body) {                  // ---- streaming path ----
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          const sentenceRe = /[^.!?\n]*[.!?\n]+/;          // a chunk ending in . ! ? or newline
+          let full = "", buf = "", started = false, speakChain = Promise.resolve();
+          const enqueue = (s) => { s = s.trim(); if (s) speakChain = speakChain.then(() => speakText(s)); };
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            if (!started) { started = true; setMood("talking"); }   // eyes come alive on the first token
+            full += chunk; buf += chunk;
+            speech.textContent = full;                               // caption fills in live
+            let m;
+            while ((m = buf.match(sentenceRe))) { enqueue(m[0]); buf = buf.slice(m[0].length); }
+          }
+          if (buf.trim()) enqueue(buf);     // trailing text with no end punctuation
+          await speakChain;                 // return only once every sentence has been spoken
+          setMood(""); return;
+        }
+
+        // ---- fallback: non-streaming /chat → { reply } (works on a minimal orchestrator) ----
+        const r2 = await fetch(BRAIN + "/chat", { method: "POST", headers, body });
+        if (!r2.ok) throw new Error("HTTP " + r2.status);
+        const reply = (((await r2.json()) || {}).reply || "").trim();
+        setMood("talking"); speech.textContent = reply || "…";
+        await speakText(reply);
+        setMood("");
+      } catch (err) { speech.textContent = "⚠️ " + err.message; setMood(""); }
+    }
+
+    // ---- hands-free conversation loop (mic is idle while R1 thinks/speaks → no self-hearing) ----
+    let convoOn = false, looping = false;
+    async function convoLoop() {
+      if (looping) return; looping = true;
+      try {
+        while (convoOn) {
+          setMood("listening"); speech.textContent = "listening…";
+          let heard = "";
+          try { heard = await listenOnce(); }
+          catch (e) { if (e && e.perm) { convoOn = false; mic.classList.remove("on"); speech.textContent = "🎤 mic permission denied"; break; } }
+          if (!convoOn) break;
+          if (heard) { await handleTurn(heard, camOn ? grabFrame() : null); await new Promise((r) => setTimeout(r, 300)); }
+        }
+      } finally { looping = false; setMood(""); }
+    }
+
+    // typing always works; it pauses the listen loop for that turn, then resumes
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim(); if (!text) return;
+      input.value = ""; unlock();
+      const wasOn = convoOn; convoOn = false; stopListening();
+      await handleTurn(text, camOn ? grabFrame() : null);
+      if (wasOn) { convoOn = true; mic.classList.add("on"); convoLoop(); }
+    });
+
+    // mic toggles hands-free mode
+    mic.addEventListener("click", async () => {
+      unlock();
+      if (convoOn) { convoOn = false; mic.classList.remove("on"); stopListening(); setMood(""); speech.textContent = "tap 🎤 and talk to me"; return; }
+      if (native) { try { await SRnative.requestPermissions(); } catch (_) {} }
+      convoOn = true; mic.classList.add("on"); convoLoop();
+    });
+
+    if (!BSR && !native) mic.style.display = "none";
+
+    // 👁 toggles R1's sight. Turning it on takes an immediate look + react; while on,
+    // every voice/typed turn carries the current frame so R1 sees what you're doing.
+    look.addEventListener("click", async () => {
+      unlock();
+      if (camOn) { camOn = false; look.classList.remove("on"); stopCam(); speech.textContent = "👁 off"; return; }
+      if (!(await startCam())) return;
+      camOn = true; look.classList.add("on");
+      const frame = grabFrame();
+      if (frame) await handleTurn("What do you see right now? React in one short, playful sentence.", frame);
+    });
+
+    // ---- settings panel (stored per-device in localStorage; blank = use the built-in defaults) ----
+    const settings = document.getElementById("settings");
+    const $ = (id) => document.getElementById(id);
+    const setOrClear = (k, v) => { v = v.trim(); v ? localStorage.setItem(k, v) : localStorage.removeItem(k); };
+    function openSettings() {
+      $("s-brain").value = localStorage.getItem("brain") || "";
+      $("s-token").value = localStorage.getItem("token") || "";
+      settings.hidden = false;
+    }
+    $("gear").addEventListener("click", openSettings);
+    $("s-cancel").addEventListener("click", () => { settings.hidden = true; });
+    $("s-save").addEventListener("click", () => {
+      setOrClear("brain", $("s-brain").value);
+      setOrClear("token", $("s-token").value);
+      location.reload();   // re-read config cleanly
+    });
+
+    // First run (or after the URL was cleared): open Settings so there's somewhere to point.
+    if (!BRAIN) { speech.textContent = "tap ⚙ to set your orchestrator URL"; openSettings(); }
+  </script>
+</body>
+</html>
