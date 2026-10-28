@@ -18,6 +18,21 @@ firmware/   the ESP32 body — motors, later (PlatformIO)
 
 That split is the whole point. Each layer is the only thing that knows its own backend, so replacing one touches nothing else.
 
+## The anatomy (naming)
+
+The three folders map onto a body with a nervous system and a brain. The thing to be precise about: **the body has two halves, and the ESP32 is one of them — it is *not* the orchestrator.**
+
+- **Body = phone + ESP32.** Two limbs of one dumb body. The **phone** is senses + face (camera, mic, speaker, display; runs the thin R1 app). The **ESP32** is motion: it drives the servos and any extra physical sensors the phone can't give me (encoders, IMU, cliff/bump). Neither half thinks.
+- **Nervous system = the laptop host server** (`server/`, Python). The orchestrator. It talks to the phone's R1 app, runs the perception/saliency layer, and decides when to escalate — then sends face/speech/motion commands back out. This is the hub both limbs report to, not the ESP32.
+- **Brain = Qwen** (self-hosted on the Omen, RTX 4060). Episodic cognition, called by the orchestrator only when the saliency layer says a moment is worth a thought.
+
+**Open wiring question (not yet settled): does the ESP32 report to the laptop orchestrator, or to the phone?**
+
+- *ESP32 ↔ laptop (over WiFi)* keeps the orchestrator as the single hub — perception, brain call, and motion all flow through one Python process, one command contract. Matches "the device never thinks." Leaning this way.
+- *ESP32 ↔ phone (WiFi/BLE)* is a shorter physical link (both ride on the robot) but makes the phone a router and creates a second command path to keep straight.
+
+Decision pending; defaulting to **ESP32 ↔ laptop** unless a reason to move it onto the phone shows up.
+
 ## Keeping the logic out of the frontend
 
 I don't want to write HTML, JS or Kotlin — *"i wanted to program these logic by myself, but i dont want to do html, js or kotlin."* So the phone frontend stays deliberately thin and generic: the face, the mic/camera plumbing, the WebSocket client, and nothing more. Every decision that actually matters — the perception, the senses, the brain call — lives in the Python orchestrator, my strongest language. The ESP32 firmware is the same story: a dumb body driven from the orchestrator.
